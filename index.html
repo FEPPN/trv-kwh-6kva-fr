@@ -40,6 +40,11 @@
     /* Zone du graphique : toujours entièrement visible, pas de clipping */
     .chart{ width:100%; height: 400px; overflow: visible; }
     canvas{ display:block; width:100% !important; height:100% !important; background: transparent !important; }
+    .sub-bottom{
+  text-align: center;
+  margin-top: 8px;     /* espace au-dessus du texte */
+}
+
 
     /* Sur mobile, le badge passe sous le titre pour éviter tout chevauchement */
     @media (max-width: 600px){
@@ -64,7 +69,9 @@
     <div class="chart">
       <canvas id="chart" aria-label="Courbe en paliers du kWh TTC (TRV Base 6 kVA)"></canvas>
     </div>
-    <p><p class="sub">Option Base 6&nbsp;kVA — prix TTC — paliers appliqués au 1ᵉʳ&nbsp;février et au 1ᵉʳ&nbsp;août (depuis 2021)</p></p>
+    <p class="sub sub-bottom">
+  Option Base 6&nbsp;kVA — prix TTC — paliers appliqués au 1ᵉʳ&nbsp;février et au 1ᵉʳ&nbsp;août (depuis 2021)
+</p>
   </div>
 
   <script>
