@@ -151,14 +151,14 @@
 
     // Gradient sûr (chartArea indisponible au 1er layout -> couleur de secours)
     function makeGradient(ctx){
-      const { chart } = ctx;
-      const { ctx: c, chartArea } = chart;
-      if(!chartArea) return 'rgba(90,82,255,0.08)'; // fallback au premier rendu
-      const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-      g.addColorStop(0, 'rgba(90,82,255,0.20)'); // haut
-      g.addColorStop(1, 'rgba(90,82,255,0.03)'); // bas
-      return g;
-    }
+  const { chart } = ctx;
+  const { ctx: c, chartArea } = chart;
+  if (!chartArea) return 'rgba(90,82,255,0.08)';   // première passe : couleur simple
+  const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  g.addColorStop(0, 'rgba(90,82,255,0.20)');
+  g.addColorStop(1, 'rgba(90,82,255,0.03)');
+  return g;
+}
 
     /* ========= Data ========= */
 
