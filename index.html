@@ -1,0 +1,47 @@
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(async function() {
+  const csvUrl = 'Option_Base.csv'; // ton fichier brut
+  const response = await fetch(csvUrl);
+  const csvText = await response.text();
+  
+  const data = Papa.parse(csvText, { header: true, delimiter: ";" }).data;
+
+  // Filtre : P_SOUSCRITE == 6
+  const filtered = data.filter(row => row["P_SOUSCRITE"] == "6");
+
+  // Parse dates & valeurs
+  const rows = filtered.map(r => ({
+    date: new Date(r["DATE_APPLICATION"]),
+    value: parseFloat(r["PART_VARIABLE_TTC"].replace(",", "."))
+  })).filter(r => !isNaN(r.value));
+
+  // Garde seulement février et août >= 2021
+  const targetMonths = [1, 7]; // JS: Jan=0, Fév=1, Août=7
+  const points = [];
+  for (const year of [...new Set(rows.map(r => r.date.getFullYear()))]) {
+    if (year >= 2021) {
+      for (const m of targetMonths) {
+        const target = new Date(year, m, 1);
+        // prend le dernier prix connu avant la cible
+        const prev = rows.filter(r => r.date <= target).sort((a,b)=>b.date-a.date)[0];
+        if (prev) points.push({ date: target.toISOString().slice(0,10), value: prev.value });
+      }
+    }
+  }
+
+  // Chart.js
+  new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { 
+      labels: points.map(p => p.date),
+      datasets: [{ label: "PART_VARIABLE_TTC (6 kVA)", data: points.map(p => p.value), stepped: true, pointRadius: 4 }]
+    },
+    options: {
+      plugins: { tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(4) + ' €/kWh' }}},
+      scales: { y: { ticks: { callback: v => v.toFixed(3) + ' €' }}}
+    }
+  });
+})();
+</script>
