@@ -3,37 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Prix électricité — TRV (6 kVA)</title>
+  <title>Prix électricité — TRV (Option Base, 6 kVA)</title>
+
+  <!-- Fonts & libs -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
     :root{
-      /* papernest palette */
-      --pn-primary:#5A52FF;  /* indigo */
+      /* Papernest */
+      --pn-primary:#5A52FF;
       --pn-teal:#0FC4B2;
       --pn-pink:#FF6C95;
       --pn-sun:#FFB81D;
 
-      --bg:#f6f7fb;          /* fond neutre */
-      --card:#ffffff;
-      --line:#eef1fb;        /* bordure douce */
-      --text:#0e1320;
-      --muted:#6b7280;
+      --bg:#F5F7FB;
+      --text:#0E1320;
+      --muted:#6B7280;
+      --line:#EEF1FB;
+      --card:#FFFFFF;
       --grid:rgba(16,24,40,.06);
-      --shadow:0 16px 40px rgba(15, 20, 40, .08);
+      --shadow:0 18px 44px rgba(15,20,40,.10);
       --radius:22px;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
       margin:0; background:var(--bg); color:var(--text);
       font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
-    .wrap{max-width:1100px; margin:40px auto; padding:0 20px;}
-
-    /* Card style proche de ta ref */
+    .wrap{max-width:1120px; margin:40px auto; padding:0 18px;}
     .card{
+      position:relative;
       background:var(--card);
       border:1px solid var(--line);
       border-radius:var(--radius);
@@ -41,174 +42,198 @@
       padding:28px 24px 16px;
     }
     h2{
-      margin:0 0 8px; text-align:center; letter-spacing:-.02em;
-      font-size:28px; font-weight:800; color:var(--pn-primary);
+      margin:0 0 6px; text-align:center;
+      font-weight:800; font-size:28px; letter-spacing:-.02em; color:var(--pn-primary);
     }
-    .subtitle{
-      margin:0 auto 8px; text-align:center; color:var(--muted); font-size:14px;
-    }
-    .chart-holder{padding:8px 8px 12px;}
+    .subtitle{margin:0 0 8px; text-align:center; color:var(--muted); font-size:14px}
+
+    .chart-holder{padding:8px 8px 14px;}
     canvas{width:100% !important; height:460px !important;}
 
-    /* Légende type “pilule” centrée */
-    .legend{
-      display:flex; justify-content:center; gap:18px;
-      padding:10px 0 4px; flex-wrap:wrap;
-    }
+    /* Légende pilule centrée */
+    .legend{display:flex; justify-content:center; gap:16px; padding-top:6px; flex-wrap:wrap}
     .pill{
       display:inline-flex; align-items:center; gap:8px;
-      border-radius:999px; padding:6px 12px; font-size:13px; font-weight:600;
-      border:2px solid currentColor; background:#fff;
+      padding:6px 12px; border-radius:999px; background:#fff; border:2px solid currentColor;
+      font-size:13px; font-weight:600;
     }
-    .swatch{width:14px; height:10px; border-radius:6px; background:currentColor}
-    .muted{color:var(--muted)}
-    .foot{margin-top:8px; text-align:center; color:var(--muted); font-size:12px}
+    .sw{width:14px; height:10px; border-radius:6px; background:currentColor}
+
+    /* Carte “Dernière valeur” */
+    .last-card{
+      position:absolute; right:20px; top:18px;
+      background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px 12px;
+      box-shadow:0 10px 24px rgba(15,20,40,.08); min-width:190px;
+    }
+    .last-title{margin:0; font-size:12px; color:var(--muted); font-weight:600}
+    .last-val{margin:4px 0 0; font-size:20px; font-weight:800}
+    .last-date{margin:2px 0 0; font-size:12px; color:var(--muted)}
+    .foot{margin-top:6px; text-align:center; color:var(--muted); font-size:12px}
+    a{color:var(--pn-primary); text-decoration:none}
+    a:hover{text-decoration:underline}
   </style>
 </head>
 <body>
   <div class="wrap">
     <section class="card">
+      <div class="last-card" aria-live="polite">
+        <p class="last-title">Dernière valeur</p>
+        <p class="last-val" id="lastVal">—</p>
+        <p class="last-date" id="lastDate">—</p>
+      </div>
+
       <h2>Prix électricité — TRV (Option Base, 6 kVA)</h2>
       <p class="subtitle">PART_VARIABLE_TTC — points au <b>1ᵉʳ février</b> et <b>1ᵉʳ août</b>, depuis 2021</p>
 
       <div class="chart-holder">
-        <canvas id="chart" aria-label="Évolution du kWh TTC (TRV Base 6 kVA)"></canvas>
+        <canvas id="chart" aria-label="Évolution kWh TTC (TRV Base 6 kVA)"></canvas>
       </div>
 
-      <!-- légende “pilules” -->
-      <div id="legend" class="legend">
-        <!-- Une seule série ici, mais deux styles prêts si tu ajoutes d'autres courbes -->
-        <span class="pill" style="color:var(--pn-primary)"><span class="swatch"></span>kWh TTC — 6 kVA</span>
-        <!-- Exemple d'autre style prêt : <span class="pill" style="color:var(--pn-teal)"><span class="swatch"></span>Série 2</span> -->
+      <div class="legend" id="legend">
+        <span class="pill" style="color:var(--pn-primary)"><span class="sw"></span>kWh TTC — 6 kVA</span>
       </div>
 
-      <div class="foot">Données&nbsp;: <span class="muted">Option_Base.csv (TRV officiels)</span> • Unité&nbsp;: €/kWh TTC • Rendu&nbsp;: aire dégradée + stepline</div>
+      <p class="foot">Données : <a href="Option_Base.csv">Option_Base.csv</a> • Unité : €/kWh TTC • Rendu : aire dégradée + stepline</p>
     </section>
   </div>
 
   <script>
-    // ---- helpers
     const euro = (v, d=3) => (typeof v==='number' ? v.toLocaleString('fr-FR',{minimumFractionDigits:d, maximumFractionDigits:4}) : v);
+    const fmtDate = d => d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
     function pickColumns(headers){
       const find = (rxArr) => headers.find(h => rxArr.some(rx => rx.test(h)));
-      const dateCol = find([/date.*app/i, /^date$/i, /date/i]);
+      const dateCol = find([/date[_ ]?debut/i, /date.*app/i, /^date$/i, /date/i]);
       const pCol    = find([/^p[_ ]?souscrite$/i, /p[_ ]?souscrite/i]);
       const valCol  = find([/part[_ ]?variable[_ ]?ttc/i, /kwh.*ttc/i]);
-      if(!dateCol) throw new Error('Colonne date introuvable (ex: DATE_APPLICATION)');
-      if(!pCol)    throw new Error('Colonne P_SOUSCRITE introuvable');
-      if(!valCol)  throw new Error('Colonne PART_VARIABLE_TTC introuvable');
-      return {dateCol, pCol, valCol};
+      if(!dateCol) throw new Error("Colonne date introuvable (ex: DATE_DEBUT)");
+      if(!pCol)    throw new Error("Colonne P_SOUSCRITE introuvable");
+      if(!valCol)  throw new Error("Colonne PART_VARIABLE_TTC introuvable");
+      return { dateCol, pCol, valCol };
     }
 
     async function loadPoints(){
-      const resp = await fetch('Option_Base.csv');
+      const resp = await fetch('Option_Base.csv?v=' + Date.now()); // bust cache
       if(!resp.ok) throw new Error('Option_Base.csv non trouvé à la racine du repo');
       const text = await resp.text();
 
-      const parsed = Papa.parse(text, { header:true, delimiter:';' });
+      const parsed = Papa.parse(text, {
+        header: true, delimiter: ";", skipEmptyLines: true,
+        transformHeader: h => h.trim()
+      });
       const rows0 = parsed.data;
       const headers = parsed.meta.fields || Object.keys(rows0[0]||{});
-      const {dateCol, pCol, valCol} = pickColumns(headers);
+      const { dateCol, pCol, valCol } = pickColumns(headers);
 
+      // Parse & filtre (6 kVA)
       const rows = rows0.map(r=>{
         const v = (r[valCol]??'').toString().trim().replace(/\s/g,'').replace(',', '.');
         const p = (r[pCol]??'').toString().trim().replace(',', '.');
-        return { date: new Date(r[dateCol]), p: Number(p), value: Number(v) };
+        const d = new Date(r[dateCol]);
+        return { date:d, p:Number(p), value:Number(v) };
       }).filter(r => r.p===6 && Number.isFinite(r.value) && !isNaN(r.date));
 
       rows.sort((a,b)=>a.date-b.date);
+
+      // borne depuis 2021
       const start = new Date(2021,0,1);
       const src = rows.filter(r=>r.date>=start);
       const lastDate = src.length ? src[src.length-1].date : null;
 
-      // 1er fév & 1er août de chaque année couverte
-      const years = [...new Set(src.map(r=>r.date.getFullYear()))].filter(y=>y>=2021);
-      const targets=[];
-      for(const y of years){
-        const feb = new Date(y,1,1);  if(!lastDate || feb<=lastDate) targets.push(feb);
-        const aug = new Date(y,7,1);  if(!lastDate || aug<=lastDate) targets.push(aug);
-      }
-      targets.sort((a,b)=>a-b);
+      // *** garantir 2025 ***
+      const lastYearInData = lastDate ? lastDate.getFullYear() : new Date().getFullYear();
+      const endYear = Math.max(lastYearInData, 2025);
 
-      // valeur = dernier palier ≤ date cible
+      // 1 fév & 1 août pour chaque année 2021..endYear
+      const targets=[];
+      for(let y=2021; y<=endYear; y++){
+        targets.push(new Date(y,1,1)); // 1er fév
+        targets.push(new Date(y,7,1)); // 1er août
+      }
+
+      // “merge-asof” : dernier prix connu <= date cible
       const points=[];
       for(const t of targets){
         const prev = src.filter(r=>r.date<=t).sort((a,b)=>b.date-a.date)[0];
-        if(prev) points.push({date:t, value:prev.value});
+        if(prev) points.push({ date:t, value:prev.value });
       }
       return points;
     }
 
     function makeGradient(ctx, area, color){
       const g = ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      // teinte principale -> transparence
-      g.addColorStop(0, color+'33');   // ~20%
-      g.addColorStop(1, color+'08');   // ~3%
+      g.addColorStop(0, color+'33'); // 20%
+      g.addColorStop(1, color+'08'); // 3%
       return g;
+    }
+
+    function updateLastBadge(points){
+      if(!points.length) return;
+      const last = points[points.length-1];
+      document.getElementById('lastVal').textContent  = euro(last.value, 4) + ' €/kWh';
+      document.getElementById('lastDate').textContent = fmtDate(last.date);
     }
 
     async function boot(){
       const points = await loadPoints();
+      updateLastBadge(points);
 
       const labels = points.map(p => p.date.toISOString().slice(0,10));
       const data   = points.map(p => p.value);
 
       const ctx = document.getElementById('chart').getContext('2d');
 
-      const chart = new Chart(ctx, {
+      new Chart(ctx, {
         type: 'line',
         data: {
           labels,
           datasets: [{
             label: 'kWh TTC — 6 kVA',
             data,
-            stepped: true,           // TRV = paliers -> stepline (fidèle)
+            stepped: true,                 // fidèle aux paliers TRV
             borderColor: '#5A52FF',
             borderWidth: 3,
-            pointRadius: 0,          // look “propre”
-            pointHoverRadius: 4,
+            pointRadius: 0,
+            pointHitRadius: 20,           // hover facile même sans points visibles
             fill: true,
-            backgroundColor: (c) => makeGradient(c.chart.ctx, c.chart.chartArea, '#5A52FF'),
+            backgroundColor: (c) => makeGradient(c.chart.ctx, c.chart.chartArea, '#5A52FF')
           }]
         },
         options: {
-          responsive:true,
-          maintainAspectRatio:false,
+          responsive:true, maintainAspectRatio:false,
           layout:{ padding:{ left:6, right:6 }},
-          interaction:{ mode:'index', intersect:false },
+          interaction:{ mode:'index', intersect:false }, // tooltip au survol de la colonne
           plugins:{
             legend:{ display:false },
             tooltip:{
               backgroundColor:'#101828',
-              titleColor:'#fff',
-              bodyColor:'#fff',
-              borderWidth:0,
+              titleColor:'#fff', bodyColor:'#fff',
               padding:10,
               callbacks:{
-                label: (ctx) => euro(ctx.parsed.y,4)+' €/kWh'
+                title: (items) => {
+                  // affichage FR lisible (1 févr. 2025)
+                  const d = new Date(items[0].label);
+                  return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+                },
+                label: (ctx) => euro(ctx.parsed.y, 4) + ' €/kWh'
               }
             }
           },
           scales:{
-            x:{
-              grid:{ color:'rgba(16,24,40,.04)' },
-              ticks:{ color:'#586174', maxRotation:0, autoSkip:true }
-            },
+            x:{ grid:{ color:'rgba(16,24,40,.04)' }, ticks:{ color:'#586174', maxRotation:0, autoSkip:true }},
             y:{
               beginAtZero:false,
               grid:{ color:'rgba(16,24,40,.06)' },
-              ticks:{ color:'#586174', callback:(v)=>euro(typeof v==='number'? v:Number(v),3)+' €' },
-              title:{ display:false }
+              ticks:{ color:'#586174', callback:(v)=>euro(typeof v==='number'? v:Number(v),3)+' €' }
             }
           }
         }
       });
     }
 
-    boot().catch(e => {
-      console.error(e);
-      alert('Erreur de rendu: ' + e.message);
+    boot().catch(err=>{
+      console.error(err);
+      alert('Erreur: ' + err.message);
     });
   </script>
 </body>
