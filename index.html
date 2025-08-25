@@ -3,20 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Prix électricité — TRV (Option Base, 6 kVA)</title>
+  <title>TRV — kWh TTC (Option Base, 6 kVA)</title>
   <meta name="theme-color" content="#5A52FF" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root{
-      /* papernest */
-      --pn-primary:#5A52FF;
-      --pn-teal:#0FC4B2;
-      --pn-pink:#FF6C95;
-      --pn-sun:#FFB81D;
-
-      /* UI */
+      --pn:#5A52FF;     /* papernest indigo */
       --bg:#F6F7FB;
       --card:#FFFFFF;
       --text:#0E1320;
@@ -24,122 +18,72 @@
       --line:#EEF1FB;
       --grid:rgba(16,24,40,.06);
       --shadow:0 18px 44px rgba(15,20,40,.10);
-      --radius:22px;
+      --radius:20px;
     }
-
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .wrap{max-width:1120px; margin:40px auto; padding:0 18px;}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{max-width:1120px;margin:40px auto;padding:0 18px}
+    .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:26px 22px 16px}
+    h2{margin:0 0 6px;text-align:center;font-weight:800;font-size:26px;letter-spacing:-.02em;color:var(--pn)}
+    .sub{margin:0 0 8px;text-align:center;color:var(--muted);font-size:14px}
+    .chart{padding:8px 6px 10px}
+    canvas{width:100% !important;height:420px !important}
 
-    .card{
-      position:relative;
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:28px 24px 16px;
+    /* Dernière valeur (badge) */
+    .last{
+      position:absolute;right:16px;top:16px;background:#fff;border:1px solid var(--line);border-radius:14px;
+      padding:10px 12px;box-shadow:0 10px 24px rgba(15,20,40,.08);min-width:180px
     }
-    h2{
-      margin:0 0 6px;
-      text-align:center;
-      font-weight:800;
-      font-size:28px;
-      letter-spacing:-.02em;
-      color:var(--pn-primary);
-    }
-    .subtitle{
-      margin:0 0 8px;
-      text-align:center;
-      color:var(--muted);
-      font-size:14px;
-    }
-    .chart-holder{padding:8px 8px 14px;}
-    canvas{width:100% !important; height:460px !important;}
+    .last h3{margin:0;font:600 12px/1 Inter;color:var(--muted)}
+    .last .v{margin:4px 0 0;font:800 20px/1.2 Inter}
+    .last .d{margin:2px 0 0;font:400 12px/1.2 Inter;color:var(--muted)}
 
-    /* Légende pilule centrée */
-    .legend{display:flex; justify-content:center; gap:16px; padding-top:6px; flex-wrap:wrap}
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 12px; border-radius:999px; background:#fff; border:2px solid currentColor;
-      font-size:13px; font-weight:600;
-    }
-    .sw{width:14px; height:10px; border-radius:6px; background:currentColor}
-
-    /* Carte “Dernière valeur” */
-    .last-card{
-      position:absolute; right:20px; top:18px;
-      background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px 12px;
-      box-shadow:0 10px 24px rgba(15,20,40,.08); min-width:190px;
-    }
-    .last-title{margin:0; font-size:12px; color:var(--muted); font-weight:600}
-    .last-val{margin:4px 0 0; font-size:20px; font-weight:800}
-    .last-date{margin:2px 0 0; font-size:12px; color:var(--muted)}
-
-    .foot{margin-top:6px; text-align:center; color:var(--muted); font-size:12px}
-    a{color:var(--pn-primary); text-decoration:none}
+    .foot{margin-top:6px;text-align:center;color:var(--muted);font-size:12px}
+    a{color:var(--pn);text-decoration:none}
     a:hover{text-decoration:underline}
   </style>
 </head>
 <body>
   <div class="wrap">
     <section class="card">
-      <!-- Carte dernière valeur -->
-      <div class="last-card" aria-live="polite">
-        <p class="last-title">Dernière valeur</p>
-        <p class="last-val" id="lastVal">—</p>
-        <p class="last-date" id="lastDate">—</p>
+      <div class="last" aria-live="polite">
+        <h3>Dernière valeur</h3>
+        <div class="v" id="lastVal">—</div>
+        <div class="d" id="lastDate">—</div>
       </div>
 
-      <h2>Prix électricité — TRV (Option Base, 6 kVA)</h2>
-      <p class="subtitle">
-        PART_VARIABLE_TTC — points au <b>1ᵉʳ février</b> et <b>1ᵉʳ août</b>, depuis 2021
-      </p>
+      <h2>Prix du kWh — TRV (Option Base, 6 kVA)</h2>
+      <p class="sub">PART_VARIABLE_TTC — points au <b>1ᵉʳ février</b> et <b>1ᵉʳ août</b>, depuis 2021</p>
 
-      <div class="chart-holder">
+      <div class="chart">
         <canvas id="chart" aria-label="Évolution kWh TTC (TRV Base 6 kVA)"></canvas>
       </div>
 
-      <!-- légende -->
-      <div class="legend" id="legend">
-        <span class="pill" style="color:var(--pn-primary)"><span class="sw"></span>kWh TTC — 6 kVA</span>
-      </div>
-
-      <p class="foot">Données : <a href="Option_Base.csv">Option_Base.csv</a> • Unité : €/kWh TTC • Rendu : aire dégradée + stepline</p>
+      <p class="foot">Données : <a href="Option_Base.csv">Option_Base.csv</a> • Unité : €/kWh TTC • Rendu : stepline (paliers TRV)</p>
     </section>
   </div>
 
   <script>
-    /* ========= Helpers ========= */
+    /* ===== Helpers ===== */
+    const euro = (v, d=3) => (typeof v === 'number'
+      ? v.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: 4 })
+      : v
+    );
+    const fmtDate = d => d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
 
-    // Format monétaire euro avec décimales FR
-    const euro = (v, d=3) =>
-      (typeof v==='number' ? v.toLocaleString('fr-FR',{minimumFractionDigits:d, maximumFractionDigits:4}) : v);
-
-    // Date courte FR (ex: 01 févr. 2025)
-    const fmtDate = d =>
-      d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
-
-    // Parse date robuste (dd/mm/yyyy ou ISO)
     function parseDate(str){
-      if(!str) return new Date(''); // invalid
+      if(!str) return new Date('');
       const s = String(str).trim();
-      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/yyyy
       if(m){
         const [ , dd, mm, yyyy ] = m;
         return new Date(Number(yyyy), Number(mm)-1, Number(dd));
       }
-      const d = new Date(s);
-      return d;
+      return new Date(s); // ISO/other
     }
 
-    // Détection des colonnes (priorise DATE_DEBUT, puis DATE_APPLICATION)
     function pickColumns(headers){
-      const find = (rxArr) => headers.find(h => rxArr.some(rx => rx.test(h)));
+      const find = rxs => headers.find(h => rxs.some(rx => rx.test(h)));
       const dateCol = find([/date[_ ]?debut/i, /date.*app/i, /^date$/i, /date/i]);
       const pCol    = find([/^p[_ ]?souscrite$/i, /p[_ ]?souscrite/i]);
       const valCol  = find([/part[_ ]?variable[_ ]?ttc/i, /kwh.*ttc/i]);
@@ -149,73 +93,53 @@
       return { dateCol, pCol, valCol };
     }
 
-    // Gradient sûr (chartArea indisponible au 1er layout -> couleur de secours)
-    function makeGradient(ctx){
-  const { chart } = ctx;
-  const { ctx: c, chartArea } = chart;
-  if (!chartArea) return 'rgba(90,82,255,0.08)';   // première passe : couleur simple
-  const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-  g.addColorStop(0, 'rgba(90,82,255,0.20)');
-  g.addColorStop(1, 'rgba(90,82,255,0.03)');
-  return g;
-}
-
-    /* ========= Data ========= */
-
+    /* ===== Data (CSV -> points Fév/Août) ===== */
     async function loadPoints(){
-      const resp = await fetch('Option_Base.csv?v=' + Date.now()); // bust cache
+      const resp = await fetch('Option_Base.csv?v=' + Date.now(), { cache:'no-store' });
       if(!resp.ok) throw new Error('Option_Base.csv non trouvé à la racine du repo');
-
       const text = await resp.text();
-      const parsed = Papa.parse(text, {
-        header: true,
-        delimiter: ";",
-        skipEmptyLines: true,
-        transformHeader: h => h.trim()
-      });
 
+      const parsed = Papa.parse(text, {
+        header: true, delimiter: ";", skipEmptyLines: true, transformHeader: h => h.trim()
+      });
       const rows0 = parsed.data;
-      const headers = parsed.meta.fields || Object.keys(rows0[0]||{});
+      const headers = parsed.meta.fields || Object.keys(rows0[0] || {});
       const { dateCol, pCol, valCol } = pickColumns(headers);
 
-      // Parse & filtre (6 kVA)
-      const rows = rows0.map(r=>{
-        const v = (r[valCol]??'').toString().trim().replace(/\s/g,'').replace(',', '.');
-        const p = (r[pCol]??'').toString().trim().replace(',', '.');
+      const rows = rows0.map(r => {
+        const v = (r[valCol] ?? '').toString().trim().replace(/\s/g,'').replace(',', '.');
+        const p = (r[pCol]  ?? '').toString().trim().replace(',', '.');
         const d = parseDate(r[dateCol]);
-        return { date:d, p:Number(p), value:Number(v) };
-      }).filter(r => r.p===6 && Number.isFinite(r.value) && !isNaN(r.date));
+        return { date: d, p: Number(p), value: Number(v) };
+      }).filter(r => r.p === 6 && Number.isFinite(r.value) && !isNaN(r.date));
 
-      rows.sort((a,b)=>a.date-b.date);
+      rows.sort((a,b) => a.date - b.date);
 
-      // borne depuis 2021
-      const start = new Date(2021,0,1);
-      const src = rows.filter(r=>r.date>=start);
-      const lastDate = src.length ? src[src.length-1].date : null;
+      // depuis 2021
+      const start = new Date(2021, 0, 1);
+      const src = rows.filter(r => r.date >= start);
+      if(!src.length) return [];
 
-      // Assurer 2025 visible : on va jusqu'au max(lastYear, 2025)
-      const lastYearInData = lastDate ? lastDate.getFullYear() : new Date().getFullYear();
-      const endYear = Math.max(lastYearInData, 2025);
-
-      // 1 fév & 1 août pour chaque année 2021..endYear
-      const targets=[];
-      for(let y=2021; y<=endYear; y++){
-        targets.push(new Date(y,1,1)); // 1er fév
-        targets.push(new Date(y,7,1)); // 1er août
+      const lastDate = src[src.length - 1].date;
+      const endYear = Math.max(lastDate.getFullYear(), 2025); // garantir 2025 présent
+      const targets = [];
+      for(let y = 2021; y <= endYear; y++){
+        targets.push(new Date(y, 1, 1)); // 1 fév
+        targets.push(new Date(y, 7, 1)); // 1 août
       }
+      targets.sort((a,b) => a-b);
 
-      // Valeur = dernier palier <= date cible
-      const points=[];
-      for(const t of targets.sort((a,b)=>a-b)){
-        const prev = src.filter(r=>r.date<=t).sort((a,b)=>b.date-a.date)[0];
-        if(prev) points.push({ date:t, value:prev.value });
+      // “merge-asof” : dernier tarif connu <= date cible
+      const points = [];
+      for(const t of targets){
+        const prev = src.filter(r => r.date <= t).sort((a,b) => b.date - a.date)[0];
+        if(prev) points.push({ date: t, value: prev.value });
       }
       return points;
     }
 
-    /* ========= UI ========= */
-
-    function updateLastBadge(points){
+    /* ===== UI ===== */
+    function updateLastCard(points){
       if(!points.length) return;
       const last = points[points.length-1];
       document.getElementById('lastVal').textContent  = euro(last.value, 4) + ' €/kWh';
@@ -227,7 +151,7 @@
         const points = await loadPoints();
         if(!points.length) throw new Error('Aucun point trouvé (vérifie P_SOUSCRITE=6 et PART_VARIABLE_TTC)');
 
-        updateLastBadge(points);
+        updateLastCard(points);
 
         const labels = points.map(p => p.date.toISOString().slice(0,10));
         const data   = points.map(p => p.value);
@@ -241,27 +165,30 @@
             datasets: [{
               label: 'kWh TTC — 6 kVA',
               data,
-              stepped: true,               // fidèle aux paliers TRV
+              stepped: true,              // paliers TRV
               borderColor: '#5A52FF',
               borderWidth: 3,
-              pointRadius: 0,              // look épuré
-              pointHitRadius: 20,          // hover confortable
-              fill: true,
-              backgroundColor: (ctx) => makeGradient(ctx) // gradient sûr
+              pointRadius: 3,             // petits points visibles
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#5A52FF',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              fill: false                  // on reste minimal/solide (pas de gradient fragile)
             }]
           },
           options: {
-            responsive:true,
-            maintainAspectRatio:false,
-            layout:{ padding:{ left:6, right:6 }},
-            interaction:{ mode:'index', intersect:false }, // tooltip lisible au survol vertical
-            plugins:{
-              legend:{ display:false },
-              tooltip:{
-                backgroundColor:'#101828',
-                titleColor:'#fff', bodyColor:'#fff',
-                padding:10,
-                callbacks:{
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { left: 6, right: 6 } },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#101828',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                padding: 10,
+                callbacks: {
                   title: (items) => {
                     const d = new Date(items[0].label);
                     return fmtDate(d);
@@ -270,15 +197,18 @@
                 }
               }
             },
-            scales:{
-              x:{
-                grid:{ color:'rgba(16,24,40,.04)' },
-                ticks:{ color:'#586174', maxRotation:0, autoSkip:true }
+            scales: {
+              x: {
+                grid: { color: 'rgba(16,24,40,.06)' },
+                ticks: { color: '#586174', maxRotation: 0, autoSkip: true }
               },
-              y:{
-                beginAtZero:false,
-                grid:{ color:'rgba(16,24,40,.06)' },
-                ticks:{ color:'#586174', callback:(v)=>euro(typeof v==='number'? v:Number(v),3)+' €' }
+              y: {
+                beginAtZero: false,
+                grid: { color: 'rgba(16,24,40,.06)' },
+                ticks: {
+                  color: '#586174',
+                  callback: (v) => euro(typeof v === 'number' ? v : Number(v), 3) + ' €'
+                }
               }
             }
           }
