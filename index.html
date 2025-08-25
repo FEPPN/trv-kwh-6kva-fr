@@ -1,47 +1,314 @@
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-(async function() {
-  const csvUrl = 'Option_Base.csv'; // ton fichier brut
-  const response = await fetch(csvUrl);
-  const csvText = await response.text();
-  
-  const data = Papa.parse(csvText, { header: true, delimiter: ";" }).data;
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TRV — kWh TTC (Option Base, 6 kVA) — papernest style</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  // Filtre : P_SOUSCRITE == 6
-  const filtered = data.filter(row => row["P_SOUSCRITE"] == "6");
+  <style>
+    :root{
+      --pn-primary: #5A52FF;   /* indigo papernest */
+      --pn-teal:    #0FC4B2;
+      --pn-pink:    #FF6C95;
+      --pn-sun:     #FFB81D;
+      --bg: #ffffff;
+      --text: #101214;
+      --muted:#6B7280;
+      --line:#EEF1FB;
+      --card:#FAFBFF;
+      --shadow: 0 10px 30px rgba(37, 56, 88, .08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg);
+      font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--text);
+    }
+    .wrap{max-width:1080px; margin:32px auto; padding:0 20px;}
+    header{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px;}
+    h1{margin:0; font-weight:800; letter-spacing:-0.02em; font-size:28px;}
+    .sub{color:var(--muted); margin-top:6px; font-size:14px}
+    .badge{display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px}
+    .chip{
+      font-size:12px; padding:6px 10px; border:1px solid var(--line);
+      border-radius:999px; background:#fff;
+    }
+    .card{
+      background:var(--card); border:1px solid var(--line); border-radius:16px;
+      box-shadow:var(--shadow); padding:18px;
+    }
+    .row{display:grid; grid-template-columns:1fr; gap:16px;}
+    @media(min-width:960px){ .row{ grid-template-columns: 2.2fr 1fr; } }
+    .metrics{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+    .tile{
+      background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+    }
+    .tile h3{margin:0; font-size:12px; color:var(--muted); font-weight:600}
+    .tile p{margin:6px 0 0; font-size:20px; font-weight:700}
+    .tile small{color:var(--muted)}
+    .legend{display:flex; gap:10px; align-items:center; margin:10px 0 0}
+    .dot{width:10px; height:10px; border-radius:50%}
 
-  // Parse dates & valeurs
-  const rows = filtered.map(r => ({
-    date: new Date(r["DATE_APPLICATION"]),
-    value: parseFloat(r["PART_VARIABLE_TTC"].replace(",", "."))
-  })).filter(r => !isNaN(r.value));
+    /* chart sizing */
+    .chart-box{background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px}
+    canvas{width:100% !important; height:420px !important;}
 
-  // Garde seulement février et août >= 2021
-  const targetMonths = [1, 7]; // JS: Jan=0, Fév=1, Août=7
-  const points = [];
-  for (const year of [...new Set(rows.map(r => r.date.getFullYear()))]) {
-    if (year >= 2021) {
-      for (const m of targetMonths) {
-        const target = new Date(year, m, 1);
-        // prend le dernier prix connu avant la cible
-        const prev = rows.filter(r => r.date <= target).sort((a,b)=>b.date-a.date)[0];
-        if (prev) points.push({ date: target.toISOString().slice(0,10), value: prev.value });
+    /* buttons */
+    .btn{
+      border:1px solid var(--line); background:#fff; border-radius:12px; padding:8px 12px; cursor:pointer;
+      transition: box-shadow .2s ease;
+    }
+    .btn:hover{ box-shadow: 0 8px 22px rgba(15,20,40,.06); }
+    .btn.primary{ border-color: rgba(90,82,255,.25); background:linear-gradient(0deg,#fff, #fff), var(--pn-primary); }
+    .muted{ color:var(--muted) }
+
+    footer{margin:18px 0 0; font-size:12px; color:var(--muted)}
+    a{ color:var(--pn-primary); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Comment évolue le prix du kWh ?</h1>
+        <p class="sub">
+          TRV — Option Base — <b>6 kVA</b> — <b>PART_VARIABLE_TTC</b> — points Fév & Août (depuis 2021)
+        </p>
+        <div class="badge">
+          <span class="chip">Source : TRV officiels (CSV)</span>
+          <span class="chip">Affichage : stepline</span>
+          <span class="chip">Unité : €/kWh TTC</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a class="btn" href="Option_Base.csv" download>📄 Télécharger le CSV</a>
+        <button class="btn primary" id="refresh">🔄 Recharger</button>
+      </div>
+    </header>
+
+    <div class="row">
+      <section class="card chart-box">
+        <canvas id="chart" aria-label="Évolution du TRV kWh TTC (6 kVA)"></canvas>
+        <div class="legend">
+          <span class="dot" style="background:var(--pn-primary)"></span>
+          <span class="muted">PART_VARIABLE_TTC (6 kVA)</span>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="metrics">
+          <div class="tile">
+            <h3>Dernier point</h3>
+            <p id="lastVal">–</p>
+            <small id="lastDate">–</small>
+          </div>
+          <div class="tile">
+            <h3>Évol. vs point précédent</h3>
+            <p id="deltaAbs">–</p>
+            <small id="deltaPct" class="muted">–</small>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <h3 style="margin:0 0 6px; font-size:12px; color:var(--muted)">Infos</h3>
+          <ul style="margin:6px 0 0 16px; padding:0; line-height:1.5; font-size:13px">
+            <li>2 relevés/an (1 février & 1 août), valeur du dernier palier ≤ à la date cible.</li>
+            <li>Lecture directe de <code>Option_Base.csv</code> (aucun backend).</li>
+            <li>Design papernest : <span style="color:var(--pn-primary)">#5A52FF</span>, <span style="color:var(--pn-teal)">#0FC4B2</span>, <span style="color:var(--pn-pink)">#FF6C95</span>, <span style="color:var(--pn-sun)">#FFB81D</span>.</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+
+    <footer>
+      Généré côté client avec PapaParse + Chart.js. Dernière mise à jour CSV détectée : <span id="csvUpdated">–</span>.
+    </footer>
+  </div>
+
+  <script>
+    // === Utils couleurs / format ===
+    const brand = {
+      line:   getComputedStyle(document.documentElement).getPropertyValue('--pn-primary').trim(),
+      point:  getComputedStyle(document.documentElement).getPropertyValue('--pn-teal').trim(),
+      grid:   'rgba(16, 18, 20, 0.06)',
+      tick:   '#8A90A2'
+    };
+    const fmtEuro = (v, min=3) => (typeof v==='number' ? v.toLocaleString('fr-FR', { minimumFractionDigits:min, maximumFractionDigits:4 }) : v);
+
+    // === Détection colonnes robustes ===
+    function pickColumns(headers){
+      const find = (rxArr) => headers.find(h => rxArr.some(rx => rx.test(h)));
+      const dateCol = find([/date.*app/i, /date/i]);
+      const pCol    = find([/^p[_ ]?souscrite$/i, /p[_ ]?souscrite/i]);
+      const valCol  = find([/part[_ ]?variable[_ ]?ttc/i, /kwh.*ttc/i]);
+      if(!dateCol) throw new Error("Colonne de date introuvable (ex: DATE_APPLICATION).");
+      if(!pCol)    throw new Error("Colonne P_SOUSCRITE introuvable.");
+      if(!valCol)  throw new Error("Colonne PART_VARIABLE_TTC introuvable.");
+      return { dateCol, pCol, valCol };
+    }
+
+    // === Lecture CSV et extraction des points Fév/Août ===
+    async function loadPoints(){
+      const resp = await fetch('Option_Base.csv');
+      if(!resp.ok) throw new Error('Impossible de charger Option_Base.csv');
+      const text = await resp.text();
+
+      const parsed = Papa.parse(text, { header: true, delimiter: ";" });
+      const rows0  = parsed.data;
+      const headers = parsed.meta.fields || Object.keys(rows0[0] || {});
+      const { dateCol, pCol, valCol } = pickColumns(headers);
+
+      // Parse propre : decimale virgule/point, dates JJMMAAAA ou ISO
+      const rows = rows0.map(r => {
+        const rawV = (r[valCol] ?? '').toString().trim().replace(/\s/g,'');
+        let v = parseFloat(rawV.replace(',', '.'));
+        const d = new Date(r[dateCol]);
+        const p = parseFloat((r[pCol] ?? '').toString().replace(',', '.'));
+        return { date: d, p, value: v };
+      }).filter(r => isFinite(r.value) && r.date.toString() !== 'Invalid Date' && r.p === 6);
+
+      // tri par date
+      rows.sort((a,b) => a.date - b.date);
+
+      // borne temporelle
+      const first = new Date(2021,0,1); // 2021-01-01
+      const filtered = rows.filter(r => r.date >= first);
+
+      // dernière date connue du CSV
+      const lastCsvDate = filtered.length ? filtered[filtered.length-1].date : null;
+
+      // cibles : 1 fév & 1 août pour chaque année <= dernière date du CSV
+      const years = Array.from(new Set(filtered.map(r => r.date.getFullYear()))).filter(y => y >= 2021);
+      const targets = [];
+      for(const y of years){
+        const feb = new Date(y, 1, 1);
+        const aug = new Date(y, 7, 1);
+        if(!lastCsvDate || feb <= lastCsvDate) targets.push(feb);
+        if(!lastCsvDate || aug <= lastCsvDate) targets.push(aug);
+      }
+      targets.sort((a,b)=>a-b);
+
+      // pour chaque cible : dernier prix connu <= cible
+      const points = [];
+      for(const t of targets){
+        const prev = filtered.filter(r => r.date <= t).sort((a,b)=>b.date-a.date)[0];
+        if(prev) points.push({ date: t, value: prev.value });
+      }
+
+      // métadonnées
+      return {
+        points,
+        lastCsvDate,
+      };
+    }
+
+    // === Chart.js ===
+    let chart;
+    function renderChart(points){
+      const ctx = document.getElementById('chart');
+
+      const labels = points.map(p => p.date.toISOString().slice(0,10));
+      const data   = points.map(p => p.value);
+
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'PART_VARIABLE_TTC (€/kWh) — 6 kVA',
+            data,
+            stepped: true,
+            borderColor: brand.line,
+            backgroundColor: brand.line + '20', /* léger fill */
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: brand.point,
+            pointBorderColor: brand.point,
+            pointBorderWidth: 2,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => fmtEuro(ctx.parsed.y, 4) + ' €/kWh'
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: brand.grid },
+              ticks: { color: '#4B5563', maxRotation: 0, autoSkip: true }
+            },
+            y: {
+              title: { display: true, text: '€/kWh TTC', color: '#4B5563' },
+              grid: { color: brand.grid },
+              ticks: {
+                color: '#4B5563',
+                callback: (v) => fmtEuro(typeof v==='number'? v: Number(v), 3) + ' €'
+              },
+              beginAtZero: false
+            }
+          }
+        }
+      });
+    }
+
+    // === KPIs latéraux ===
+    function updateMetrics(points, lastCsvDate){
+      if(!points.length) return;
+      const last = points[points.length-1];
+      const prev = points[points.length-2];
+
+      const lastValEl  = document.getElementById('lastVal');
+      const lastDateEl = document.getElementById('lastDate');
+      lastValEl.textContent  = fmtEuro(last.value, 4) + ' €/kWh';
+      lastDateEl.textContent = new Date(last.date).toLocaleDateString('fr-FR', { year:'numeric', month:'long', day:'2-digit' });
+
+      const deltaAbsEl = document.getElementById('deltaAbs');
+      const deltaPctEl = document.getElementById('deltaPct');
+      if(prev){
+        const delta = last.value - prev.value;
+        const pct   = (delta / prev.value) * 100;
+        deltaAbsEl.textContent = (delta > 0 ? '+' : '') + fmtEuro(delta, 4) + ' €/kWh';
+        deltaPctEl.textContent = (delta > 0 ? '+' : '') + pct.toFixed(2) + ' %';
+        // teinte selon signe
+        deltaAbsEl.style.color = delta >= 0 ? 'var(--pn-pink)' : 'var(--pn-teal)';
+        deltaPctEl.style.color = delta >= 0 ? 'var(--pn-pink)' : 'var(--pn-teal)';
+      }else{
+        deltaAbsEl.textContent = '—';
+        deltaPctEl.textContent = '—';
+      }
+
+      const csvUpdated = document.getElementById('csvUpdated');
+      csvUpdated.textContent = lastCsvDate
+        ? lastCsvDate.toLocaleDateString('fr-FR', { year:'numeric', month:'long', day:'2-digit' })
+        : '—';
+    }
+
+    async function boot(){
+      try{
+        const { points, lastCsvDate } = await loadPoints();
+        renderChart(points);
+        updateMetrics(points, lastCsvDate);
+      }catch(err){
+        console.error(err);
+        alert('Erreur: ' + err.message + '\nVérifie les en-têtes du CSV et son emplacement.');
       }
     }
-  }
 
-  // Chart.js
-  new Chart(document.getElementById('chart'), {
-    type: 'line',
-    data: { 
-      labels: points.map(p => p.date),
-      datasets: [{ label: "PART_VARIABLE_TTC (6 kVA)", data: points.map(p => p.value), stepped: true, pointRadius: 4 }]
-    },
-    options: {
-      plugins: { tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(4) + ' €/kWh' }}},
-      scales: { y: { ticks: { callback: v => v.toFixed(3) + ' €' }}}
-    }
-  });
-})();
-</script>
+    document.getElementById('refresh').addEventListener('click', boot);
+    boot();
+  </script>
+</body>
+</html>
